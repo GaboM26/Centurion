@@ -1,5 +1,6 @@
 """Model exports."""
 
-from models.order import EventOrderRequest, OrderRequest, OrderResult, OrderStatus
+from models.order import EventOrderRequest
+from models.order_result import OrderResult
 
-__all__ = ["EventOrderRequest", "OrderRequest", "OrderResult", "OrderStatus"]
+__all__ = ["EventOrderRequest", "OrderResult"]

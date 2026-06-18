@@ -98,10 +98,22 @@ class LoggingConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="LOG_")
 
 
+class AppConfig(BaseSettings):
+    """Local application behavior toggles."""
+
+    enable_test_menu: bool = Field(
+        default=True,
+        description="Enable the interactive local test menu by default in a TTY.",
+    )
+
+    model_config = SettingsConfigDict(env_prefix="CENTURION_")
+
+
 class Settings(BaseSettings):
     """Top-level settings container."""
 
     environment: str = Field(default="local", description="Runtime environment name.")
+    app: AppConfig = Field(default_factory=AppConfig)
     kalshi: KalshiConfig = Field(default_factory=KalshiConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
