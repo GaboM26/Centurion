@@ -16,6 +16,8 @@ Use this as the handoff context when resuming trading work for Delphi.
 - Reuse Delphi's existing Kalshi config and demo-vs-production switching
 - Prefer direct REST calls for trading, because the Python SDK does not expose orders cleanly enough
 - Use Kalshi OpenAPI as the source of truth: `https://docs.kalshi.com/openapi.yaml`
+- Check the Kalshi changelog before implementation work and before relying on older API assumptions: `https://docs.kalshi.com/changelog`
+- Build on the V2 event-order endpoints only; legacy `/portfolio/orders` mutation endpoints are being deprecated and should not be used for new execution flows
 
 ## Relevant Kalshi API findings
 
@@ -33,16 +35,21 @@ Use this as the handoff context when resuming trading work for Delphi.
 ### Signature rule
 
 - sign `timestamp + HTTP_METHOD + path_without_query`
-- path must be the full API path from root, e.g. `/trade-api/v2/portfolio/orders`
+- path must be the full API path from root, e.g. `/trade-api/v2/portfolio/events/orders`
 - use RSA-PSS + SHA256, then base64 encode
 
 ### Useful REST endpoints
 
-- `POST /portfolio/orders`
+Use the V2 event-order family for all trade mutation workflows.
+
 - `POST /portfolio/events/orders`
+- `DELETE /portfolio/events/orders/{order_id}`
+- `POST /portfolio/events/orders/{order_id}/decrease`
+- `POST /portfolio/events/orders/{order_id}/amend`
+- `POST /portfolio/events/orders/batched`
+- `DELETE /portfolio/events/orders/batched`
 - `GET /portfolio/orders`
 - `GET /portfolio/orders/{order_id}`
-- `DELETE /portfolio/orders/{order_id}`
 - `GET /portfolio/balance`
 - `GET /portfolio/positions`
 - `GET /portfolio/fills`
@@ -53,7 +60,6 @@ Use this as the handoff context when resuming trading work for Delphi.
 1. Keep scope narrow and target demo only first
 2. Build a minimal REST trading client
 3. Minimal models only:
-   - `OrderRequest`
    - `EventOrderRequest`
    - `OrderResult`
    - maybe `OrderStatus`
@@ -76,6 +82,8 @@ Use this as the handoff context when resuming trading work for Delphi.
 - `.github/copilot-trading-guide.md`
 - add the REST auth/signing rules
 - add the OpenAPI/demo endpoint findings
+- add the V2-only direction plus the legacy-order deprecation note
+- add a note that changelog review is mandatory before implementation work and while debugging API behavior changes
 - add the eventual-consistency note around `GET /exchange/user_data_timestamp`
 
 ## Recommended restart procedure

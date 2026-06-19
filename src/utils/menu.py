@@ -7,6 +7,7 @@ from typing import Callable
 
 from config import get_settings
 from models import EventOrderRequest, OrderResult
+from trading import KalshiMarketDataClient, KalshiTradingService
 
 
 def _bool_label(value: bool) -> str:
@@ -37,6 +38,21 @@ def _prompt_required(prompt: str) -> str:
     if not value:
         raise ValueError(f"{prompt.strip(': ')} must not be blank.")
     return value
+
+
+def _prompt_optional(prompt: str) -> str | None:
+    """Read an optional value from stdin."""
+    value = input(prompt).strip()
+    return value or None
+
+
+def _print_mapping(title: str, values: dict[str, object]) -> None:
+    """Print a simple mapping with aligned labels."""
+    print(f"\n{title}")
+    print("-" * len(title))
+    for key, value in values.items():
+        print(f"{key}: {value}")
+    print()
 
 
 def preview_event_order() -> None:
@@ -81,6 +97,72 @@ def preview_order_result() -> None:
     print()
 
 
+def place_demo_event_order() -> None:
+    """Prompt for and place a demo event order through the trade pipeline."""
+    settings = get_settings()
+    if not settings.kalshi.demo:
+        raise RuntimeError("The interactive trade menu is restricted to demo mode.")
+
+    print("\nPlace demo EventOrderRequest")
+    print("----------------------------")
+    print("This action buys YES at the current displayed ask on the Kalshi demo API.\n")
+
+    ticker = _prompt_required("Ticker: ")
+    market = KalshiMarketDataClient(settings=settings).get_market_snapshot(ticker)
+    _print_mapping(
+        "Current market quote",
+        {
+            "ticker": market.ticker,
+            "title": market.title or "(no title)",
+            "status": market.status,
+            "yes_bid_dollars": market.yes_bid_dollars,
+            "yes_ask_dollars": market.yes_ask_dollars,
+            "no_bid_dollars": market.no_bid_dollars,
+            "no_ask_dollars": market.no_ask_dollars,
+            "last_price_dollars": market.last_price_dollars,
+            "trade_side": "bid (buy YES)",
+            "selected_price": market.yes_ask_dollars,
+        },
+    )
+
+    order = EventOrderRequest(
+        ticker=market.ticker,
+        trade_type="bid",
+        price=market.yes_ask_dollars,
+        count=_prompt_required("Quantity: "),
+        description=(
+            f"Menu demo buy YES on {market.ticker} at displayed ask {market.yes_ask_dollars}"
+        ),
+    )
+
+    service = KalshiTradingService()
+    result = service.place_event_order(order)
+    _print_mapping("Placed order result", asdict(result))
+
+
+def show_recent_orders() -> None:
+    """Fetch and display recent normalized orders."""
+    print("\nRecent orders")
+    print("-------------")
+
+    limit = _prompt_optional("Limit [5]: ") or "5"
+    service = KalshiTradingService()
+    orders = service.list_orders(params={"limit": limit})
+    if not orders:
+        print("No orders returned.\n")
+        return
+
+    for index, order in enumerate(orders, start=1):
+        print(f"Order {index}")
+        print(f"order_id: {order.order_id}")
+        print(f"client_order_id: {order.client_order_id}")
+        print(f"ticker: {order.ticker}")
+        print(f"status: {order.status}")
+        print(f"trade_type: {order.trade_type}")
+        print(f"remaining_count: {order.remaining_count}")
+        print()
+
+
 @dataclass(frozen=True, slots=True)
 class MenuOption:
     """Single interactive tester option."""
@@ -96,6 +178,8 @@ def build_test_menu_options() -> tuple[MenuOption, ...]:
         MenuOption("1", "Show configuration summary", print_settings_summary),
         MenuOption("2", "Preview EventOrderRequest normalization", preview_event_order),
         MenuOption("3", "Preview OrderResult normalization", preview_order_result),
+        MenuOption("4", "Place demo event order", place_demo_event_order),
+        MenuOption("5", "Show recent orders", show_recent_orders),
     )
 
 
@@ -121,7 +205,10 @@ def run_test_menu() -> int:
 
         selected_option = valid_choices.get(choice)
         if selected_option is None:
-            print(f"Invalid option. Choose 1, 2, 3, or {exit_choice}.\n")
+            print(f"Invalid option. Choose 1, 2, 3, 4, 5, or {exit_choice}.\n")
             continue
 
-        selected_option.action()
+        try:
+            selected_option.action()
+        except (RuntimeError, ValueError) as exc:
+            print(f"Error: {exc}\n")

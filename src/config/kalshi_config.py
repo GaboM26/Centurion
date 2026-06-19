@@ -51,6 +51,29 @@ class KalshiConfig(BaseSettings):
                 object.__setattr__(self, "api_secret_path", self.demo_api_secret_path)
 
     @property
+    def api_key_error_hint(self) -> str:
+        """Return the expected API key environment variables for this mode."""
+        if self.demo:
+            return (
+                "No API key configured. Set KALSHI_DEMO_API_KEY for demo mode "
+                "(or KALSHI_API_KEY as a shared fallback)."
+            )
+
+        return "No API key configured. Set KALSHI_API_KEY."
+
+    @property
+    def api_secret_error_hint(self) -> str:
+        """Return the expected API secret environment variables for this mode."""
+        if self.demo:
+            return (
+                "No API secret configured. Set KALSHI_DEMO_API_SECRET_PATH or "
+                "KALSHI_DEMO_API_SECRET for demo mode (or KALSHI_API_SECRET_PATH / "
+                "KALSHI_API_SECRET as shared fallbacks)."
+            )
+
+        return "No API secret configured. Set KALSHI_API_SECRET_PATH or KALSHI_API_SECRET."
+
+    @property
     def resolved_api_secret(self) -> str | None:
         """Return the PEM content from api_secret or api_secret_path."""
         if self.api_secret:
@@ -71,9 +94,7 @@ class KalshiConfig(BaseSettings):
         """Load and return the RSA private key used to sign Kalshi requests."""
         pem_text = self.resolved_api_secret
         if not pem_text:
-            raise RuntimeError(
-                "No API secret configured. Set KALSHI_API_SECRET_PATH or KALSHI_API_SECRET."
-            )
+            raise RuntimeError(self.api_secret_error_hint)
 
         try:
             return serialization.load_pem_private_key(
